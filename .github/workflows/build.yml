@@ -1,0 +1,44 @@
+name: Build
+
+on:
+  push:
+    branches: [ master, develop ]
+  pull_request:
+    branches: [ master, develop ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        orbis_version: [474, 501, 503, 505, 620, 672, 900]
+
+    steps:
+        # Checkout the repository
+      - uses: actions/checkout@v2
+        # Install required stuff needed to build Mira
+      - name: preinstall
+        run: wget -q -O - https://files.viva64.com/etc/pubkey.txt | sudo apt-key add -; sudo wget -O /etc/apt/sources.list.d/viva64.list https://files.viva64.com/etc/viva64.list; sudo apt-get update; sudo apt install build-essential git clang lldb clang-tidy clang-tools cppcheck lld
+        # Handle loader crap
+      - name: create loader directories
+        run: cd loader; MIRA_PLATFORM=MIRA_PLATFORM_ORBIS_BSD_${{ matrix.orbis_version }} make create
+      - name: clean loader
+        run: cd loader; MIRA_PLATFORM=MIRA_PLATFORM_ORBIS_BSD_${{ matrix.orbis_version }} make clean
+      - name: create mira directories
+        run: cd kernel; MIRA_PLATFORM=MIRA_PLATFORM_ORBIS_BSD_${{ matrix.orbis_version }} make create
+      - name: clean mira
+        run: cd kernel; MIRA_PLATFORM=MIRA_PLATFORM_ORBIS_BSD_${{ matrix.orbis_version }} make clean
+      - name: make loader
+        run: cd loader; MIRA_PLATFORM=MIRA_PLATFORM_ORBIS_BSD_${{ matrix.orbis_version }} MIRA_CHECKS=TRUE make
+      - name: make elf
+        run: cd kernel; MIRA_PLATFORM=MIRA_PLATFORM_ORBIS_BSD_${{ matrix.orbis_version }} ADD_GIT_HASH=TRUE MIRA_CHECKS=TRUE make
+      - name: Upload loader
+        uses: actions/upload-artifact@v4
+        with:
+          name: MiraLoader_Orbis_MIRA_PLATFORM_ORBIS_BSD_${{ matrix.orbis_version }}.bin
+          path: loader/build/MiraLoader_Orbis_MIRA_PLATFORM_ORBIS_BSD_${{ matrix.orbis_version }}.bin
+      - name: Upload elf
+        uses: actions/upload-artifact@v4
+        with:
+          name: Mira_Orbis_MIRA_PLATFORM_ORBIS_BSD_${{ matrix.orbis_version }}.elf
+          path: kernel/build/Mira_Orbis_MIRA_PLATFORM_ORBIS_BSD_${{ matrix.orbis_version }}.elf
